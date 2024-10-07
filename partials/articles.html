@@ -1,0 +1,7 @@
+{{range .Articles}}
+    <div class="article">
+        <h2>{{.Titre}}</h2>
+        <p>{{.Contenu}}</p>
+        <a href="/article/{{.ID}}">Lire l'article</a>
+    </div>
+{{end}}

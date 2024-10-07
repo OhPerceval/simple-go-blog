@@ -1,0 +1,7 @@
+{{if .Connected}}
+    <h2>Bienvenue, {{.Username}}!</h2>
+    <button onclick="logout()">Se déconnecter</button>
+{{else}}
+    <button onclick="openModal('loginModal')">Se connecter</button>
+    <button onclick="openModal('registerModal')">S'inscrire</button>
+{{end}}

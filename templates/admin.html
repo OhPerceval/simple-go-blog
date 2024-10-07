@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/trumbowyg@2.25.1/dist/ui/trumbowyg.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/trumbowyg@2.25.1/plugins/colors/ui/trumbowyg.colors.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/trumbowyg@2.25.1/plugins/giphy/ui/trumbowyg.giphy.min.css">
+    
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <title>Panneau d'administration</title>
+    <style>
+        /* Style de la popup */
+        .popup {
+            display: none; /* Caché par défaut */
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            border: 1px solid #ccc;
+            padding: 20px;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .overlay {
+            display: none; /* Caché par défaut */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 500;
+        }
+
+        .close {
+            cursor: pointer;
+            color: red;
+            float: right;
+        }
+    </style>
+</head>
+<body>
+    <h1>Panneau d'administration</h1>
+
+    <!-- Section pour la création des articles -->
+    <h2>Création d'un nouvel article</h2>
+    <form id="createArticleForm" onsubmit="event.preventDefault(); submitArticleForm();">
+        <label for="create_article_titre">Titre:</label>
+        <input type="text" id="create_article_titre" required>
+        <label for="create_article_contenu">Contenu:</label>
+        <textarea id="create_article_contenu" required></textarea>
+        <button type="submit">Créer l'article</button>
+    </form>
+
+    <!-- Section pour modifier ou supprimer les articles -->
+    <h2>Modifier ou Supprimer un article</h2>
+    <select id="articleSelector" onchange="loadArticleData(this.value)">
+        <option value="">Sélectionnez un article</option>
+        <!-- Les articles seront ajoutés ici par JavaScript -->
+    </select>
+    <button onclick="openEditPopup()">Modifier l'article</button>
+    <button onclick="deleteArticle()">Supprimer l'article</button>
+
+    <div class="overlay" id="overlay" onclick="closePopup()"></div>
+    <div class="popup" id="editPopup">
+        <span class="close" onclick="closePopup()">&times;</span>
+        <h3>Modifier l'article</h3>
+        <form id="editArticleForm" onsubmit="event.preventDefault(); submitEditArticleForm();">
+            <input type="hidden" id="edit_article_id">
+            <label for="edit_article_titre">Titre:</label>
+            <input type="text" id="edit_article_titre" required>
+            <label for="edit_article_contenu">Contenu:</label>
+            <textarea id="edit_article_contenu" required></textarea>
+            <button type="submit">Sauvegarder</button>
+        </form>
+    </div>
+
+    <h3>Liste des utilisateurs</h3>
+    <ul id="usersList">
+        <!-- Les utilisateurs seront ajoutés ici par JavaScript -->
+    </ul>
+    <h4>Modifier le rôle d'un utilisateur</h4>
+    <select id="userSelector" onchange="loadUserRoleData(this.value)">
+        <option value="">Sélectionnez un utilisateur</option>
+        <!-- Les utilisateurs seront ajoutés ici par JavaScript -->
+    </select>
+    <select id="user_grade">
+        <option value="admin">Admin</option>
+        <option value="membre">Membre</option>
+    </select>
+    <button onclick="submitUserGradeForm()">Modifier le rôle</button>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/trumbowyg@2.25.1/dist/trumbowyg.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/trumbowyg@2.25.1/plugins/colors/trumbowyg.colors.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/trumbowyg@2.25.1/plugins/giphy/trumbowyg.giphy.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/trumbowyg@2.25.1/plugins/upload/trumbowyg.upload.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/trumbowyg@2.25.1/plugins/emoji/trumbowyg.emoji.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/trumbowyg@2.25.1/plugins/history/trumbowyg.history.min.js"></script>
+    <script>
+
+$(document).ready(function() {
+            $('#create_article_contenu, #edit_article_contenu').trumbowyg({
+                btns: [
+                    ['viewHTML'],
+                    ['undo', 'redo'], 
+                    ['formatting'],
+                    ['strong', 'em', 'del'],
+                    ['superscript', 'subscript'],
+                    ['link'],
+                    ['insertImage'],
+                    ['upload'], 
+                    ['giphy'],  
+                    ['emoji'],  
+                    ['foreColor', 'backColor'], 
+                    ['unorderedList', 'orderedList'],
+                    ['horizontalRule'],
+                    ['fullscreen']
+                ],
+                plugins: {
+                    giphy: {
+                        apiKey: 'r0YN8UXFOh399LCokd0DkG0z4gTgp07L',  
+                    },
+                    upload: {
+                        serverPath: '/upload_image',  
+                        fileFieldName: 'image',
+                        urlPropertyName: 'file' 
+                    }
+                }
+            });
+        });
+
+
+
+        function loadArticles() {
+            fetch('/admin?ajax=true')  
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data); 
+                    const articleSelector = document.getElementById("articleSelector");
+                    articleSelector.innerHTML = ""; 
+                    articleSelector.innerHTML += `<option value="">Sélectionnez un article</option>`;
+                    data.Articles.forEach(article => {
+                        articleSelector.innerHTML += `<option value="${article.id}">${article.titre}</option>`;
+                    });
+                })
+                .catch(error => console.error('Erreur:', error));
+        }
+
+        function loadUsers() {
+            fetch('/admin?ajax=true')  
+                .then(response => response.json())
+                .then(data => {
+                    const userSelector = document.getElementById("userSelector");
+                    userSelector.innerHTML = "";
+                    userSelector.innerHTML += `<option value="">Sélectionnez un utilisateur</option>`;
+                    data.Utilisateurs.forEach(user => {
+                        userSelector.innerHTML += `<option value="${user.id}">${user.nom}</option>`;
+                    });
+                })
+                .catch(error => console.error('Erreur:', error));
+        }
+
+        function loadArticleData(articleId) {
+            if (articleId) {
+                fetch(`/admin/article?id=${articleId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById("edit_article_id").value = data.id;
+                        document.getElementById("edit_article_titre").value = data.titre;
+                        document.getElementById("edit_article_contenu").value = data.contenu;
+                    });
+            }
+        }
+
+        function openEditPopup() {
+            const articleId = document.getElementById("articleSelector").value;
+            if (articleId) {
+                document.getElementById("overlay").style.display = "block";
+                document.getElementById("editPopup").style.display = "block";
+            }
+        }
+
+        function closePopup() {
+            document.getElementById("overlay").style.display = "none";
+            document.getElementById("editPopup").style.display = "none";
+        }
+
+        function submitArticleForm() {
+            const article = {
+                titre: document.getElementById("create_article_titre").value,
+                contenu: document.getElementById("create_article_contenu").value,
+            };
+
+            fetch('/admin/article', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(article)
+            }).then(response => {
+                if (response.ok) {
+                    loadArticles(); 
+                    document.getElementById("createArticleForm").reset();
+                }
+            });
+        }
+        function submitEditArticleForm() {
+    const articleId = document.getElementById("edit_article_id").value;
+    if (!articleId) {
+        console.error('ID de l\'article manquant');
+        return; 
+    }
+
+    const article = {
+        id: parseInt(articleId, 10), 
+        titre: document.getElementById("edit_article_titre").value,
+        contenu: document.getElementById("edit_article_contenu").value,
+    };
+
+    console.log('Article à envoyer:', article); 
+
+    fetch(`/admin/article?id=${articleId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(article)
+    }).then(response => {
+        if (response.ok) {
+            closePopup();
+            loadArticles();
+        } else {
+            return response.text().then(err => {
+                console.error('Erreur lors de la mise à jour de l\'article:', err);
+            });
+        }
+    }).catch(err => {
+        console.error('Erreur de réseau ou autre:', err);
+    });
+}
+
+function deleteArticle() {
+    const articleId = document.getElementById("articleSelector").value;
+    if (articleId) {
+        fetch(`/admin/article?id=${articleId}`, {
+            method: 'DELETE',
+        }).then(response => {
+            if (response.ok) {
+                loadArticles(); 
+                console.log(`Article avec l'ID ${articleId} supprimé avec succès.`);
+            } else {
+                console.error('Erreur lors de la suppression de l\'article:', response.status, response.statusText);
+            }
+        }).catch(err => {
+            console.error('Erreur de réseau ou autre:', err);
+        });
+    } else {
+        console.error('ID de l\'article manquant.');
+    }
+}
+
+        function loadUserRoleData(userId) {
+            if (userId) {
+               
+            }
+        }
+
+        function submitUserGradeForm() {
+    const userId = parseInt(document.getElementById("userSelector").value, 10); // Convertir en entier
+    const newGrade = document.getElementById("user_grade").value;
+
+    if (!userId || !newGrade) {
+        console.error('ID ou grade manquant');
+        return; 
+    }
+
+    fetch('/admin/user', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id: userId, grade: newGrade }) 
+    }).then(response => {
+        if (response.ok) {
+            loadUsers();
+        } else {
+            return response.text().then(err => {
+                console.error('Erreur lors de la modification du grade:', err);
+            });
+        }
+    });
+}
+
+
+        // Charger les articles et les utilisateurs au chargement de la page
+        window.onload = function() {
+            loadArticles();
+            loadUsers();
+        };
+    </script>
+</body>
+</html>

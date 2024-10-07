@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Mon Blog</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    {{if .Error}}
+    <div class="notification is-danger">
+        {{.Error}}
+    </div>
+    {{end}}
+
+    <h1>Articles</h1>
+
+    <div id="articles">
+        {{range .Articles}}
+        <div class="article" data-tags="{{.Tags}}">
+            <h2>{{.Titre}}</h2>
+            <div class="article-content">
+                {{.Contenu}}
+            </div>
+            <a href="/article/{{.ID}}" onclick="console.log('Lien cliqué');">Lire l'article</a>
+        </div>
+        {{end}}
+    </div>
+
+    <div class="pagination"></div>
+
+    <input type="hidden" id="totalArticles" value="{{.TotalArticles}}">
+
+    <div id="userStatus">
+        {{if .Connected}}
+            <h2>Bienvenue, {{.Username}}! tu es {{.Role}}</h2>
+            <button onclick="logout()">Se déconnecter</button>
+        {{else}}
+            <button onclick="openModal('loginModal')">Se connecter</button>
+            <button onclick="openModal('registerModal')">S'inscrire</button>
+        {{end}}
+    </div>
+
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('loginModal')">&times;</span>
+            <h2>Connexion</h2>
+            <form action="/login" method="post">
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="password" name="mot_de_passe" placeholder="Mot de passe" required>
+                <button type="submit">Se connecter</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('registerModal')">&times;</span>
+            <h2>Inscription</h2>
+            <form action="/register" method="post">
+                <input type="text" name="nom" placeholder="Nom" required>
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="password" name="mot_de_passe" placeholder="Mot de passe" required>
+                <input type="hidden" name="redirect" value="{{.Article.ID}}">
+                <button type="submit">S'inscrire</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = "block";
+        }
+    
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = "none";
+        }
+    
+        window.onclick = function(event) {
+            const modals = ['loginModal', 'registerModal'];
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (event.target === modal) {
+                    closeModal(modalId);
+                }
+            });
+        }
+    
+        function logout() {
+            window.location.href = '/logout';
+        }
+    
+        document.addEventListener('DOMContentLoaded', () => {
+            const allArticles = Array.from(document.querySelectorAll('.article'));
+
+            document.querySelectorAll('.tag').forEach(tag => {
+                tag.addEventListener('click', function(e) {
+                    e.preventDefault(); // Empêche le lien d'agir par défaut
+                    const selectedTag = this.getAttribute('data-tag');
+
+                    // Filtrer les articles
+                    filterArticles(selectedTag, allArticles);
+                });
+            });
+        });
+
+        function filterArticles(selectedTag, articles) {
+            articles.forEach(article => {
+                const tags = article.getAttribute('data-tags').split(',').map(tag => tag.trim());
+                if (tags.includes(selectedTag)) {
+                    article.classList.remove('hidden'); 
+                } else {
+                    article.classList.add('hidden'); 
+                }
+            });
+        }
+      
+            function loadArticles(page) {
+                fetch(`/?page=${page}`)
+                    .then(response => response.text())
+                    .then(html => {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+    
+                        document.getElementById('articles').innerHTML = doc.getElementById('articles').innerHTML;
+                        document.getElementById('userStatus').innerHTML = doc.getElementById('userStatus').innerHTML;
+    
+                        updatePagination(page, doc);
+                    })
+                    .catch(error => {
+                        console.error('Erreur lors de la récupération des articles:', error);
+                    });
+            }
+    
+            function updatePagination(currentPage, doc) {
+                const totalArticles = parseInt(doc.querySelector('#totalArticles').value);
+                const articlesPerPage = 2; 
+                const totalPages = Math.ceil(totalArticles / articlesPerPage);
+                
+                const paginationElement = document.querySelector('.pagination');
+                
+                // Réinitialiser le contenu de pagination
+                paginationElement.innerHTML = '';
+    
+                // Ajouter le bouton "Précédent" si ce n'est pas la première page
+                if (currentPage > 1) {
+                    const prevButton = document.createElement('button');
+                    prevButton.textContent = 'Précédent';
+                    prevButton.onclick = function() {
+                        loadArticles(currentPage - 1);
+                    };
+                    paginationElement.appendChild(prevButton);
+                }
+    
+                // Afficher le numéro de la page actuelle
+                const pageSpan = document.createElement('span');
+                pageSpan.textContent = ` Page ${currentPage} `;
+                paginationElement.appendChild(pageSpan);
+    
+                // Ajouter le bouton "Suivant" si ce n'est pas la dernière page
+                if (currentPage < totalPages) {
+                    const nextButton = document.createElement('button');
+                    nextButton.textContent = 'Suivant';
+                    nextButton.onclick = function() {
+                        loadArticles(currentPage + 1);
+                    };
+                    paginationElement.appendChild(nextButton);
+                }
+            }
+    
+            // Charger les articles de la première page au départ
+            loadArticles(1);
+        
+    </script>
+</body>
+</html>

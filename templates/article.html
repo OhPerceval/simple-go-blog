@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>{{.Article.Titre}}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    {{if .ErrorMessage}}
+    <div class="notification error">
+        {{.ErrorMessage}}
+    </div>
+    {{end}}
+    
+    <div id="userStatus">
+        {{if .Connected}}
+            <h2>Bienvenue, {{.Username}}! ({{.Role}})</h2>
+            <button onclick="logout()">Se déconnecter</button>
+        {{else}}
+            <button onclick="openModal('loginModal')">Se connecter</button>
+            <button onclick="openModal('registerModal')">S'inscrire</button>
+        {{end}}
+    </div>
+
+    <!-- Modal pour la connexion -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('loginModal')">&times;</span>
+            <h2>Connexion</h2>
+            <form action="/login" method="post">
+                <input type="hidden" name="redirect" value="/article/{{.Article.ID}}">
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="password" name="mot_de_passe" placeholder="Mot de passe" required>
+                <button type="submit">Se connecter</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal d'inscription -->
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('registerModal')">&times;</span>
+            <h2>Inscription</h2>
+            <form action="/register" method="post">
+                <input type="hidden" name="redirect" value="/article/{{.Article.ID}}">
+                <input type="text" name="nom" placeholder="Nom" required>
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="password" name="mot_de_passe" placeholder="Mot de passe" required>
+                <input type="hidden" name="redirect" value="{{.Article.ID}}">
+                <button type="submit">S'inscrire</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="article">
+        <h1>{{.Article.Titre}}</h1>
+        <p>{{.Article.Contenu}}</p>
+        
+        <!-- Système de réactions pour l'article -->
+        <div class="article-reactions">
+            {{if not .UserAlreadyReacted}}
+                <input type="hidden" id="article-id" value="{{.Article.ID}}">
+                <button id="like-button" onclick="sendReaction('like')">👍 {{.Article.Likes}}</button>
+                <button id="dislike-button" onclick="sendReaction('dislike')">👎 {{.Article.Dislikes}}</button>
+            {{else}}
+                <p>Vous avez déjà réagi à cet article.</p>
+                <button disabled>👍 {{.Article.Likes}}</button>
+                <button disabled>👎 {{.Article.Dislikes}}</button>
+            {{end}}
+        </div>
+
+    </div>
+
+    {{if .Connected}}
+        <form method="POST" action="/comment">
+            <input type="hidden" name="article_id" value="{{.Article.ID}}">
+            <textarea name="contenu" required></textarea>
+            <button type="submit">Commenter</button>
+        </form>
+    {{else}}
+        <p>Vous devez être connecté pour commenter.</p>
+    {{end}}
+    
+    <h2>Commentaires</h2>
+    {{range .Comments}}
+        <div class="comment" id="comment-{{.ID}}">
+            <p><strong>{{.Author}}</strong>: {{.Content}}</p>
+
+         
+
+            {{if or (eq .UserID $.UserID) (eq $.Role "admin")}} <!-- Vérifiez si l'utilisateur connecté est l'auteur ou un admin -->
+                <button onclick="toggleEditForm({{.ID}})">Modifier</button>
+                
+                <div id="edit-form-{{.ID}}" style="display:none;">
+                    <form method="POST" action="/comment/edit">
+                        <input type="hidden" name="comment_id" value="{{.ID}}">
+                        <input type="text" name="contenu" value="{{.Content}}" required>
+                        <button type="submit">Modifier</button>
+                        <button type="button" onclick="toggleEditForm({{.ID}})">Annuler</button>
+                    </form>
+                </div>
+
+                <form id="delete-comment-form-{{.ID}}" onsubmit="deleteComment(event, {{.ID}})">
+                    <input type="hidden" name="comment_id" value="{{.ID}}">
+                    <button type="submit">Supprimer</button>
+                </form>
+            {{end}}
+        </div>
+    {{else}}
+        <p>Aucun commentaire.</p>
+    {{end}}
+
+    
+    <script>
+          function openModal(modalId) {
+            document.getElementById(modalId).style.display = "block";
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            const modals = ['loginModal', 'registerModal'];
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (event.target === modal) {
+                    closeModal(modalId);
+                }
+            });
+        }
+
+        function logout() {
+    // Récupérer l'URL actuelle
+    const currentURL = window.location.pathname;
+
+    // Rediriger vers /logout avec le paramètre redirect
+    window.location.href = '/logout?redirect=' + encodeURIComponent(currentURL);
+}
+
+function toggleEditForm(commentId) {
+    const editForm = document.getElementById(`edit-form-${commentId}`);
+    if (editForm.style.display === "none") {
+        editForm.style.display = "block"; 
+    } else {
+        editForm.style.display = "none"; 
+    }
+}
+
+function deleteComment(event, commentId) {
+    event.preventDefault(); 
+
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    fetch('/comment/delete', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+
+            location.reload(); 
+        } else {
+           
+            response.text().then(text => alert(text));
+        }
+    })
+    .catch(error => console.error('Erreur:', error));
+}
+
+function sendReaction(reaction) {
+    var articleID = document.getElementById('article-id').value;
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "/article/react", true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === XMLHttpRequest.DONE) {
+            if (xhr.status === 200) {
+                var response = JSON.parse(xhr.responseText);
+                document.getElementById('like-button').innerHTML = '👍 ' + response.likes;
+                document.getElementById('dislike-button').innerHTML = '👎 ' + response.dislikes;
+                document.getElementById('like-button').disabled = true;
+                document.getElementById('dislike-button').disabled = true;
+            } else {
+                alert("Erreur : " + xhr.responseText);
+            }
+        }
+    };
+    
+    xhr.send("article_id=" + articleID + "&reaction=" + reaction);
+}
+    </script>
+</body>
+</html>
